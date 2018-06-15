@@ -7,6 +7,7 @@ import ast
 from joblib import Parallel, delayed
 import multiprocessing
 from six.moves import cPickle as pickle
+import threading
 
 
 def getMostReviewedBusinesses(reviewFile, tipFile):
@@ -75,16 +76,15 @@ def fillListOfInfluencedUsers(i, usersDic, usersReviewingImportantBusinesses):
 	listOfFriends = ast.literal_eval(usersDic[usersReviewingImportantBusinesses.user_id[i]])
 	firstComment = getFirstCommentOfUser(usersReviewingImportantBusinesses.reviewDate[i], usersReviewingImportantBusinesses.tipDate[i])
 	usersWhichCommentedAfter = getListOfUsersWhoCommentedAfter(listOfFriends, firstComment, usersReviewingImportantBusinesses)
-	print i
 	return usersWhichCommentedAfter
 
 
-def addUsersWhichCommentedAfter(fileName):
+def addUsersWhichCommentedAfter(fileName, usersDic):
 	csv.field_size_limit(1000000)
 	usersReviewingImportantBusinesses = pd.read_csv(fileName)
 	friendsWhichCommentedAfter = ["" for x in range(len(usersReviewingImportantBusinesses.user_id))]
 	#usersDic = getUsersDictionary()
-	usersDic = load_dict('userDicFile')
+	#usersDic = load_dict('userDicFile')
 	
 	for i in range(len(usersReviewingImportantBusinesses.user_id)):
 		listOfAllFriends = usersReviewingImportantBusinesses.allFriends[i]
@@ -100,11 +100,14 @@ def addUsersWhichCommentedAfter(fileName):
 def getListOfUsersWhoCommentedAfter(listOfAllFriends, usersReviewingImportantBusinesses, indexPosition):
 	listOfFriendsWhoCommentedAfter = []
 	usersWhichCommentedAfter = list(usersReviewingImportantBusinesses.iloc[indexPosition:, 0])
+	usersWhichCommentedAfterDate = list(usersReviewingImportantBusinesses.iloc[indexPosition:, 3])
 	for i in range(len(usersWhichCommentedAfter)):
-		currentID = usersWhichCommentedAfter[i]
+		currentID = str(usersWhichCommentedAfter[i])
 		if(currentID in listOfAllFriends):
-			listOfFriendsWhoCommentedAfter.append(currentID)
-
+			influencedFriendsDict = {}
+			currentFirstComment = str(usersWhichCommentedAfterDate[i])
+			influencedFriendsDict[currentID] = currentFirstComment
+			listOfFriendsWhoCommentedAfter.append(influencedFriendsDict)
 	return listOfFriendsWhoCommentedAfter
 
 def addFirstCommentColumn(csvFile):
@@ -194,14 +197,28 @@ if __name__ == '__main__':
 	#addFriendsColumn("usersReviewingImportantBusinesses_cYwJA2A6I12KNkm2rtXd5g.csv")
 	
 	#sortByFirstComment("usersReviewingImportantBusinesses_4JNXUYY8wbaaDmk3BPzlWw.csv")
-	addUsersWhichCommentedAfter("usersReviewingImportantBusinesses_cYwJA2A6I12KNkm2rtXd5g.csv")
+	#addUsersWhichCommentedAfter("usersReviewingImportantBusinesses_cYwJA2A6I12KNkm2rtXd5g.csv")
 	#addFirstCommentColumn("usersReviewingImportantBusinesses_4JNXUYY8wbaaDmk3BPzlWw.csv")
 	#addRatioOfInfluencedFriends("usersReviewingImportantBusinesses.csv")
 
-	'''most_popular_business_id = ["K7lWdNUhCbcnEvI0NhGewg", 
-	"4JNXUYY8wbaaDmk3BPzlWw", "RESDUcs7fIiihp38-d6_6g", 
-	"cYwJA2A6I12KNkm2rtXd5g", "DkYS3arLOhA8si5uUEmHOw"]
+	#most_popular_business_id = ["K7lWdNUhCbcnEvI0NhGewg", 
+	#"4JNXUYY8wbaaDmk3BPzlWw", "RESDUcs7fIiihp38-d6_6g", 
+	#"cYwJA2A6I12KNkm2rtXd5g", "DkYS3arLOhA8si5uUEmHOw"]
+	most_popular_business_id = ["K7lWdNUhCbcnEvI0NhGewg", "DkYS3arLOhA8si5uUEmHOw"]
+	usersDic = load_dict('userDicFile')
+	
+	processes = []
 	for business_id in most_popular_business_id:
 		fileName = "usersReviewingImportantBusinesses_" + business_id + ".csv"
-		addFirstCommentColumn(fileName)
-		sortByFirstComment(fileName)'''
+		#addFirstCommentColumn(fileName)
+		#sortByFirstComment(fileName)
+		t = multiprocessing.Process(target=addUsersWhichCommentedAfter, args=(fileName, usersDic))
+		processes.append(t)
+		t.start()
+	for one_process in processes:
+		one_process.join()
+
+		
+	#addUsersWhichCommentedAfter(fileName, usersDic)
+
+
