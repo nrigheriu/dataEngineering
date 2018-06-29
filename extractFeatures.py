@@ -23,7 +23,7 @@ def getMostReviewedBusinesses(reviewFile, tipFile):
 	for i in range (len(tipFile.business_id)):
 		currentID = tipFile.business_id[i]
 		if(currentID not in allBusiness_IDs):
-			allBusiness_IDs[currentID] = 1
+			allBusiness_IDs[currentID] = 1 
 		else:
 			allBusiness_IDs[currentID] += 1
 	
@@ -31,46 +31,52 @@ def getMostReviewedBusinesses(reviewFile, tipFile):
 	writeToFile("sorted_businesses", sorted_businesses)
 	most_popular_business_id = sorted_businesses[-1][0]
 
-def extractUsersReviewingImportantBusinesses(reviewFile, tipFile):
-	reviewFile = pd.read_csv(reviewFile, usecols=["user_id", "business_id", "date"])
-	tipFile = pd.read_csv(tipFile, usecols=["user_id", "business_id", "date"])
-	most_popular_business_id = ["K7lWdNUhCbcnEvI0NhGewg", 
-	"4JNXUYY8wbaaDmk3BPzlWw", "RESDUcs7fIiihp38-d6_6g", 
-	"cYwJA2A6I12KNkm2rtXd5g", "DkYS3arLOhA8si5uUEmHOw"]
-	reviewDf = reviewFile[reviewFile['business_id'].isin(most_popular_business_id)]
-	reviewDf = reviewDf.reset_index(drop=True)	
-	tipDf = tipFile[tipFile['business_id'].isin(most_popular_business_id)]
-	tipDf = tipDf.reset_index(drop = True)
-	for business_id in most_popular_business_id:
-		currentBusinessIdList = [business_id]
-		currentReviewDf = reviewDf[reviewDf['business_id'].isin(currentBusinessIdList)]
-		currentReviewDf = currentReviewDf.reset_index(drop = True)
-		currentTipDf = tipDf[reviewDf['business_id'].isin(currentBusinessIdList)]
-		currentTipDf = currentTipDf.reset_index(drop = True)
-		reviewingUsers = getDatesOfFirstComment(currentReviewDf, currentTipDf)
-		targetFilename = "usersReviewingImportantBusinesses_"+ business_id + ".csv"
-		
-		writeToFile(targetFilename, list(reviewingUsers.items()))
+def extractUsersReviewingImportantBusinesses(business_id):
+	reviewDf, tipDf = filterReviewAndTipFilesByBusinessId(business_id)
+	reviewingUsers = getDatesOfFirstComment(reviewDf, tipDf)
+	targetFilename = "usersReviewingImportantBusinesses_"+ business_id + ".csv"
+	writeToFile(targetFilename, list(reviewingUsers.items()))
 
 def getDatesOfFirstComment(filteredReviews, filteredTips):
 	reviewingUsers = {}
 	for i in range (len(filteredReviews.user_id)):
 		currentID = filteredReviews.user_id[i]
 		currentDate = filteredReviews.date[i]
+		reviewText = filteredReviews.text[i]
 		dateOfReview = datetime.datetime.strptime(currentDate, "%Y-%m-%d")
 		if currentID not in reviewingUsers:
-			reviewingUsers[currentID] = [currentDate, ""]
+			reviewingUsers[currentID] = [currentDate, "", reviewText]
 		elif(dateOfReview < datetime.datetime.strptime(reviewingUsers[currentID][0], "%Y-%m-%d")):
-			reviewingUsers[currentID] = [currentDate, ""]
+			reviewingUsers[currentID] = [currentDate, "", reviewText]
 	for i in range(len(filteredTips.user_id)):
 		currentID = filteredTips.user_id[i]
 		currentDate = filteredTips.date[i]
+		tipText = filteredTips.text[i]
 		dateOfReview = datetime.datetime.strptime(currentDate, "%Y-%m-%d")
 		if currentID not in reviewingUsers:
-			reviewingUsers[currentID] = ["", currentDate]
+			reviewingUsers[currentID] = ["", currentDate, tipText]
 		elif (not reviewingUsers[currentID][1]) or (dateOfReview < datetime.datetime.strptime(reviewingUsers[currentID][1], "%Y-%m-%d")):
 			reviewingUsers[currentID][1] = currentDate
+			reviewingUsers[currentID][2] = tipText
 	return reviewingUsers
+
+def filterReviewAndTipFilesByBusinessId(business_id):
+	reviewFile = pd.read_csv("review.csv", usecols=["user_id", "business_id", "date", "text"])
+	tipFile = pd.read_csv("tip.csv", usecols=["user_id", "business_id", "date", "text"])
+	business_list = [business_id]
+	reviewDf = reviewFile[reviewFile['business_id'].isin(business_list)]
+	reviewDf = reviewDf.reset_index(drop=True)	
+	tipDf = tipFile[tipFile['business_id'].isin(business_list)]
+	tipDf = tipDf.reset_index(drop = True)
+	return reviewDf, tipDf
+
+def addFirstCommentTextColumn(fileName, business_id):
+	csvDataFrame = pd.read_csv(fileName)
+	reviewDf, tipDf = filterReviewAndTipFilesByBusinessId(business_id)
+	commentText = []
+
+	csvDataFrame.to_csv(fileName, index=False)
+
 
 def fillListOfInfluencedUsers(i, usersDic, usersReviewingImportantBusinesses):
 	listOfFriends = ast.literal_eval(usersDic[usersReviewingImportantBusinesses.user_id[i]])
@@ -157,10 +163,10 @@ def addRatioOfInfluencedFriends(usersReviewingImportantBusinesses):
 def writeToFile(filename, values):
 	with open(filename, "wb") as myfile:
 		wr = csv.writer(myfile, quoting = csv.QUOTE_ALL)
-		wr.writerow(["user_id", "reviewDate", "tipDate"])
+		wr.writerow(["user_id", "reviewDate", "tipDate", "commentText"])
 		#wr.writerow(values)   #this is for sorted Busineses
 		for i in range(len(values)):
-			wr.writerow([values[i][0], values[i][1][0], values[i][1][1]])
+			wr.writerow([values[i][0], values[i][1][0], values[i][1][1], values[i][1][2]])
 	myfile.close()	
 
 def sortByFirstComment(csvFile):
@@ -180,7 +186,7 @@ def addFriendsColumn(csvFile):
 		listOfFriends = ast.literal_eval(usersDic[csvDataFrame.user_id[i]])	
 		allFriends[i] = listOfFriends
 	csvDataFrame['allFriends'] = allFriends
-	csvDataFrame.to_csv(csvFile, index=False)
+	csvDataFrame.to_csv(csvFile, index=False)	
 
 def save_dict(di_, filename_):
     with open(filename_, 'wb') as f:
@@ -203,16 +209,20 @@ if __name__ == '__main__':
 
 	#most_popular_business_id = ["K7lWdNUhCbcnEvI0NhGewg", 
 	#"4JNXUYY8wbaaDmk3BPzlWw", "RESDUcs7fIiihp38-d6_6g", 
-	#"cYwJA2A6I12KNkm2rtXd5g", "DkYS3arLOhA8si5uUEmHOw"]
-	most_popular_business_id = ["K7lWdNUhCbcnEvI0NhGewg", "DkYS3arLOhA8si5uUEmHOw"]
-	usersDic = load_dict('userDicFile')
+	#"cYwJA2A6I12KNkm2rtXd5g", "f4x1YBxkLrZg652xt2KR5g"]
+	
+	most_popular_business_id = ["4JNXUYY8wbaaDmk3BPzlWw", "cYwJA2A6I12KNkm2rtXd5g"]#["f4x1YBxkLrZg652xt2KR5g"]
+	averagely_popular_business_id = ["wUKzaS1MHg94RGM6z8u9mw", "r_BrIgzYcwo1NAuG9dLbpg", "JLbgvGM4FXh9zNP4O5ZWjQ", "YPavuOh2XsnRbLfl0DH2lQ", "L2p0vO3fsS2LC6hhQo3CzA"]
+	#usersDict = load_dict('userDicFile')
 	
 	processes = []
 	for business_id in most_popular_business_id:
 		fileName = "usersReviewingImportantBusinesses_" + business_id + ".csv"
-		#addFirstCommentColumn(fileName)
-		#sortByFirstComment(fileName)
-		t = multiprocessing.Process(target=addUsersWhichCommentedAfter, args=(fileName, usersDic))
+		#t = multiprocessing.Process(target = extractUsersReviewingImportantBusinesses, args=(business_id, ))
+		#t = multiprocessing.Process(target = addFirstCommentColumn, args=(fileName, ))
+		t = multiprocessing.Process(target = sortByFirstComment, args=(fileName, ))
+		#t = multiprocessing.Process(target = addFriendsColumn, args=(fileName, ))
+		#t = multiprocessing.Process(target=addUsersWhichCommentedAfter, args=(fileName, usersDict))
 		processes.append(t)
 		t.start()
 	for one_process in processes:

@@ -10,8 +10,8 @@ def filter_city(csvFile):
 	#print csvRead.city.unique
 	cities = ["Las Vegas"] #, "Madison", "Phoenix", Montreal", "Toronto", "Nottingham", "Sidney"]
 	df = csvFile[csvFile['city'].isin(cities)]
-	pearsonDf = df[['business_id', 'review_count']]
-	pearsonDf.to_csv("filtered.csv")
+	pearsonDf = df[['business_id', 'review_count', 'latitude', 'longitude', 'name']]
+	pearsonDf.to_csv("filteredCity.csv", index=False)
 
 def getReviewingUsers(csvFile):
 	csvFile = pd.read_csv(csvFile)
